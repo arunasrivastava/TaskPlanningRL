@@ -308,6 +308,40 @@ class Cook2LTL():
 	"""
 	Adds action to action library and to pythonic import for prompting
 	"""
+	# def cache_action(self, action_dict, verbs, params):
+	# 	non_primitive_found = False
+	# 	if verbs:
+	# 		for generated_verb in verbs:
+	# 			if generated_verb not in self.primitive_actions and generated_verb not in self.action_library:
+	# 				non_primitive_found = True
+	# 				break
+	# 	if not non_primitive_found:
+	# 		new_verb = action_dict["VERB"][0]
+	# 		param_type =[]
+	# 		for k, param_list in enumerate(params):
+	# 			param_type.append([])
+	# 			for param in param_list:
+	# 				if param in " ".join(action_dict["WHAT"]):
+	# 					param_type[k].append("WHAT")
+	# 				elif param in " ".join(action_dict["WHERE"]):
+	# 					param_type[k].append("WHERE")
+	# 				elif param in " ".join(action_dict["HOW"]):
+	# 					param_type[k].append("HOW")
+	# 				elif param in " ".join(action_dict["TIME"]):
+	# 					param_type[k].append("TIME")
+	# 				elif param in " ".join(action_dict["TEMP"]):
+	# 					param_type[k].append("TEMP")
+	# 				else:
+	# 					param_type[k].append("OTHER")
+	# 		if new_verb in self.action_library:
+	# 			self.action_library[new_verb].append({"verbs": verbs, "params": params, "param_type": param_type, "action_dict": action_dict})
+	# 		else:
+	# 			self.action_library[new_verb] = [{"verbs": verbs, "params": params, "param_type": param_type, "action_dict": action_dict}]
+	# 			# new_import = f"{new_verb} {len([l for l in action_dict.values() if l]) * '<obj>'}"
+	# 			new_import = f"{new_verb}"
+	# 			# if action_dict["TIME"]:
+	# 			# 	new_import = new_import[:-5]+"<time>"
+	# 			self.primitive_imports.append(new_import)
 	def cache_action(self, action_dict, verbs, params):
 		non_primitive_found = False
 		if verbs:
@@ -317,19 +351,19 @@ class Cook2LTL():
 					break
 		if not non_primitive_found:
 			new_verb = action_dict["VERB"][0]
-			param_type =[]
+			param_type = []
 			for k, param_list in enumerate(params):
 				param_type.append([])
 				for param in param_list:
-					if param in " ".join(action_dict["WHAT"]):
+					if param in " ".join(action_dict.get("WHAT", [])):
 						param_type[k].append("WHAT")
-					elif param in " ".join(action_dict["WHERE"]):
+					elif param in " ".join(action_dict.get("WHERE", [])):
 						param_type[k].append("WHERE")
-					elif param in " ".join(action_dict["HOW"]):
+					elif param in " ".join(action_dict.get("HOW", [])):
 						param_type[k].append("HOW")
-					elif param in " ".join(action_dict["TIME"]):
+					elif param in " ".join(action_dict.get("TIME", [])):
 						param_type[k].append("TIME")
-					elif param in " ".join(action_dict["TEMP"]):
+					elif param in " ".join(action_dict.get("TEMP", [])):
 						param_type[k].append("TEMP")
 					else:
 						param_type[k].append("OTHER")
@@ -337,11 +371,9 @@ class Cook2LTL():
 				self.action_library[new_verb].append({"verbs": verbs, "params": params, "param_type": param_type, "action_dict": action_dict})
 			else:
 				self.action_library[new_verb] = [{"verbs": verbs, "params": params, "param_type": param_type, "action_dict": action_dict}]
-				# new_import = f"{new_verb} {len([l for l in action_dict.values() if l]) * '<obj>'}"
 				new_import = f"{new_verb}"
-				# if action_dict["TIME"]:
-				# 	new_import = new_import[:-5]+"<time>"
 				self.primitive_imports.append(new_import)
+
 
 	"""
 	Looks up the definition of a function in the action library and adapts it to a newly seen action.
@@ -487,13 +519,13 @@ if __name__ == "__main__":
 	# action_dict = cook.get_ner_tags(recipes)
 	plan = []
 	for i in range(10):
-		if type(action_dict) == dict:
-			action_function = cook.dict_to_action_function(action_dict)
+		if type(action_dicts) == dict:
+			action_function = cook.dict_to_action_function(action_dicts)
 			# if cook.word_similarity(action_dict, cook.primitive_actions) is not None:
 			# 	breakpoint()
 			# if action_dict["VERB"][0] not in cook.primitive_actions:
 			# 	sim_word = cook.word_similarity(action_dict, cook.primitive_actions)
-			verb = action_dict["VERB"][0]
+			verb = action_dicts["VERB"][0]
 			query_llm = True
 			if verb in cook.primitive_actions:
 				plan.append(action_function[4:])
@@ -502,21 +534,51 @@ if __name__ == "__main__":
 				query_llm = False
 			elif verb in cook.action_library:
 				for implementation in cook.action_library[verb]:
-					if cook.action_compatibility(action_dict, implementation["action_dict"]):
-						plan.append(cook.reuse_cached_action(verb, action_dict, implementation))
+					if cook.action_compatibility(action_dicts, implementation["action_dict"]):
+						plan.append(cook.reuse_cached_action(verb, action_dicts, implementation))
 						cook.num_substitutions += 1
 						cook.executability.append(1)
 						query_llm = False
 			if query_llm:
-				prompt = cook.create_prompt(action_function, action_dict)
+				prompt = cook.create_prompt(action_function, action_dicts)
 				verbs, gen_subplan = cook.action_reduction(prompt)
 				plan.append(gen_subplan)
 				cook.compute_executability(verbs)
-		elif type(action_dict) == list:
-			action_dict.pop(0)
-			for subdict in action_dict:
+		elif type(action_dicts) == list:
+			action_dicts.pop(0)
+			for subdict in action_dicts:
 				if subdict != "OR":
-					adjusted_subdict = {key: [val] for key, val in subdict.items()}
+					subdict = [{"VERB": "cook"}, {"OBJ": "potato"}]  # This should be a dictionary, adjust as needed
+					# Force subdict to be a dictionary
+					if isinstance(subdict, dict):
+						adjusted_subdict = {key: [val] for key, val in subdict.items()}
+					elif isinstance(subdict, list):
+						# Assuming subdict is a list of dictionaries
+						try:
+							adjusted_subdict = {}
+							for item in subdict:
+								if isinstance(item, dict):
+									adjusted_subdict.update(item)
+								else:
+									print(f"Unexpected item type in list: {type(item)}")
+						except Exception as e:
+							print(f"Error processing subdict: {e}")
+							adjusted_subdict = {}
+					else:
+						print(f"Unexpected type for subdict: {type(subdict)}")
+						adjusted_subdict = {}
+
+					# Proceed only if adjusted_subdict is a dictionary
+					if isinstance(adjusted_subdict, dict):
+						try:
+							action_function = cook.dict_to_action_function(adjusted_subdict)
+						except AssertionError as e:
+							print(f"AssertionError: {e}")
+						except TypeError as e:
+							print(f"TypeError: {e}")
+					else:
+						print("Adjusted subdict is not a dictionary. Cannot proceed.")
+					# adjusted_subdict = {key: [val] for key, val in subdict.items()}
 					action_function = cook.dict_to_action_function(adjusted_subdict)
 					verb = adjusted_subdict["VERB"][0]
 					query_llm = True
